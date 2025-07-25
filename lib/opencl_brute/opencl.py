@@ -801,3 +801,21 @@ class opencl_algos:
         else:
             assert ("Error on hash type, unknown !!!")
         return [prg, bufStructs]
+    
+    def cl_multibit_md5_init(self, salt_len):
+        """Initialize OpenCL context for MultiBit MD5 processing"""
+        bufStructs = buffer_structs()
+        # Configure buffer for MD5 with specific salt length
+        self.max_out_bytes = bufStructs.specifyMD5(max_in_bytes=128, max_salt_bytes=salt_len, dklen=48)  # 3x MD5 = 48 bytes
+        prg = self.opencl_ctx.compile(bufStructs, "multibit_md5.cl", None)
+        return [prg, bufStructs]
+    
+    def cl_multibit_md5(self, ctx, passwords, salt):
+        """Execute MultiBit MD5 processing on GPU"""
+        prg = ctx[0]
+        bufStructs = ctx[1]
+
+        def func(s, pwdim, pass_g, salt_g, result_g):
+            prg.multibit_md5_main(s.queue, pwdim, None, pass_g, salt_g, result_g)
+
+        return concat(self.opencl_ctx.run(bufStructs, func, iter(passwords), salt, mdpad_64_func))
